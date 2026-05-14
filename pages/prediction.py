@@ -81,7 +81,7 @@ st.markdown(f"""
 
 /* Sidebar translúcido */
 [data-testid="stSidebar"] {{
-    background: rgba(255, 234, 208, 0.7) !important;
+    background: rgba(100, 100, 100, 0.7) !important;
     border-radius: 1.5rem 0 0 1.5rem;
     box-shadow: 2px 0 16px 0 rgba(255, 183, 94, 0.10);
 }}

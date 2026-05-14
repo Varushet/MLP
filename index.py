@@ -39,12 +39,12 @@ st.markdown(f"""
     text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }}
 [data-testid="stSidebar"] {{
-    background-color: rgba(255, 255, 255, 0.3);
+    background: rgba(100, 100, 100, 0.7) !important;
 }}
 
 </style>
 
-<h1>Welcome to Weathery</h1>
+<h1>Bienvenido a Weathery</h1>
 
 <p>Un proyecto de Machine Learning sobre el clima del planeta</p>
 <p>Explora las diferentes herramientas y funcionalidades creadas a partir de fuentes de datos y sus predicciones:</p>

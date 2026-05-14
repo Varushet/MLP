@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-import streamlit as st
 import base64
-import os
 import joblib
+import numpy as np
+from collections import Counter
 
 # Función para convertir imagen local a Base64
 def get_image_as_base64(file_path):
@@ -13,7 +13,6 @@ def get_image_as_base64(file_path):
 st.set_page_config(page_title="Mi Proyecto Climático", layout="wide")
 
 image_path = "img/night.jpeg"
-
 img_base64 = get_image_as_base64(image_path)
 
 st.markdown(f"""
@@ -24,8 +23,6 @@ st.markdown(f"""
     background-attachment: fixed;
     background-position: center;
 }}
-
-/* Encabezado principal con sombra y gradiente */
 .stApp h1 {{
     color: #D3D3D3;
     font-size: 4.5rem;
@@ -36,8 +33,6 @@ st.markdown(f"""
     text-shadow: 0 2px 8px #C0C0C0CC;
     display: inline-block;
 }}
-
-/* Parrafos destacados */
 .stApp p, .stApp .stMarkdown p {{
     color: #D3D3D3;
     border-radius: 1rem;
@@ -49,21 +44,17 @@ st.markdown(f"""
     text-align: center;
     justify-content: center;
 }}
-
-/* Tarjetas y contenedores */
 .stApp .stDataFrame, .stApp .stTable, .stApp .stAlert, .stApp .stMarkdown, .stApp .stButton, .stApp .stNumberInput, .stApp .stSelectbox {{
-    background: #102A43CC !important; 
+    background: #102A43CC !important;
     border-radius: 1.2rem !important;
     box-shadow: 0 2px 16px 0 #C0C0C0CC;
     color: #fff8f0 !important;
     text-align: center;
     justify-content: center;
 }}
-
-/* Botones modernos */
-.stApp button, .stApp .stButton>button{{
+.stApp button, .stApp .stButton>button {{
     background: linear-gradient(90deg, #102A43 0%, #C0C0C0 100%) !important;
-    border: none !important; 
+    border: none !important;
     border-radius: 1.2rem !important;
     font-weight: bold !important;
     font-size: 1.2rem !important;
@@ -74,226 +65,190 @@ st.markdown(f"""
 .stApp button:hover, .stApp .stButton>button:hover {{
     background: linear-gradient(90deg, #C0C0C0 0%, #102A43 100%) !important;
 }}
-
-/* Inputs y selectores */
 .stApp input, .stApp select, .stApp textarea {{
     color: rgba(255, 248, 240) !important;
     font-size: 1.1rem !important;
 }}
-
-/* Sidebar translúcido */
 [data-testid="stSidebar"] {{
     color: rgba(0, 0, 0) !important;
-    background: rgba(208, 208, 208, 0.3) !important;
+    background: rgba(100, 100, 100, 0.7) !important;
     border-radius: 1.5rem 0 0 1.5rem;
     box-shadow: 2px 0 16px 0 rgba(255, 183, 94, 0.10);
 }}
-
-/* Scrollbar personalizado */
-::-webkit-scrollbar {{
-    color: rgba(0, 0, 0) !important;
-    width: 10px;
-    background: #ffecd0;
-}}
-::-webkit-scrollbar-thumb {{
-    color: rgba(0, 0, 0) !important;
-    background: #ffb75e;
-    border-radius: 8px;
-}}
-
-/* Mejorar contraste de widgets */
-.stApp .stNumberInput input, .stApp .stSelectbox div {{
-    color: rgba(255, 234, 208) !important;
-}}
-
-/* Ajuste de tabla resumen */
-.stApp .stDataFrame th, .stApp .stDataFrame td {{
-    background: rgba(255,255,255,0.85) !important;
-    color: #3d2c1e !important;
-}}
-
-/* Mensajes de éxito y advertencia */
+::-webkit-scrollbar {{ width: 10px; background: #ffecd0; }}
+::-webkit-scrollbar-thumb {{ background: #ffb75e; border-radius: 8px; }}
+.stApp .stNumberInput input, .stApp .stSelectbox div {{ color: rgba(255, 234, 208) !important; }}
+.stApp .stDataFrame th, .stApp .stDataFrame td {{ background: rgba(255,255,255,0.85) !important; color: #3d2c1e !important; }}
 .stApp .stAlert[data-baseweb="notification"] {{
     background: linear-gradient(90deg, #ffecd0 0%, #ffb75e 100%) !important;
     color: #3d2c1e !important;
     border-radius: 1.2rem !important;
-    box-shadow: 0 2px 8px 0 rgba(255, 183, 94, 0.10);
 }}
 </style>
 
 <h1>A meteorology based game</h1>
-
 <p>Match an AI to guess a country in the entire world based only on geographic and climatologic data.</p>
-
 """, unsafe_allow_html=True)
 
 
-# --- 1. CARGA DE RECURSOS REALES (usando modelo FinalLvL.pkl y dataset real) ---
+# --- 1. CARGA DE RECURSOS ---
 
 @st.cache_resource
 def cargar_recursos_juego():
-    # Cargar dataset real (ajusta el path y columnas según tu dataset)
     df = pd.read_csv('data/climaDS.csv.gz')
-    # Asegúrate de que las columnas estén en el orden correcto y con los nombres correctos
-    # Ejemplo de columnas: ['Pais', 'Precipitacion', 'Temp_Media', 'Humedad', 'Horas_Sol', 'Altitud_Media', 'Latitude']
-    # Si tu dataset tiene otros nombres, ajústalos aquí
-    # Cargar modelo entrenado
     modelo = joblib.load('models/final_boss.pkl')
-    # Crear label encoder para los países
 
-    col_id = 'country_id'
+    col_id   = 'country_id'
     col_name = 'country'
-    
-    # Verificación básica por si acaso
+
     if col_id not in df.columns or col_name not in df.columns:
         st.error(f"Columnas no encontradas. Revisa que '{col_id}' y '{col_name}' existan en el CSV.")
         st.stop()
 
-    # Definir el orden de las pistas (de menos a más informativas)
-    all_features_model = ['precip_mm', 'cloud', 'latitude', 'wind_kph', 'humidity', 'Air_poll', 'sun_h', 'longitude'] 
+    # Orden exacto del entrenamiento — no cambiar
+    all_features_model = ['longitude', 'temp_C', 'humidity', 'precip_mm', 'wind_kph', 'cloud', 'Air_poll', 'sun_h']
 
+    # Las features más dominantes (temp_C, longitude) se revelan las últimas
+    # para que la IA empiece ciega y converja al final
     features_names = [
         ['precip_mm', 'cloud'],
         ['precip_mm', 'cloud', 'wind_kph'],
         ['precip_mm', 'cloud', 'wind_kph', 'humidity', 'Air_poll'],
         ['precip_mm', 'cloud', 'wind_kph', 'humidity', 'Air_poll', 'sun_h'],
-        ['precip_mm', 'cloud', 'wind_kph', 'humidity', 'Air_poll', 'sun_h', 'longitude'],
-        ['precip_mm', 'cloud', 'wind_kph', 'humidity', 'Air_poll', 'sun_h', 'longitude', 'latitude']
+        ['precip_mm', 'cloud', 'wind_kph', 'humidity', 'Air_poll', 'sun_h', 'temp_C'],
+        ['precip_mm', 'cloud', 'wind_kph', 'humidity', 'Air_poll', 'sun_h', 'temp_C', 'longitude'],
     ]
     return df, modelo, col_id, col_name, features_names, all_features_model
 
 
-# Cargamos los recursos
 df_juego, modelo_ia, col_id, col_name, lista_features, all_features_model = cargar_recursos_juego()
 
-# Calcular medias de las features para rellenar valores no revelados
-medias_features = df_juego[all_features_model].mean()
+# Precalculamos la matriz de features del dataset entero para el sampleo
+matriz_dataset = df_juego[all_features_model].values
 
-# --- 2. INICIALIZACIÓN SEGURA DEL ESTADO ---
-# Esto debe estar SIEMPRE al principio para no sobrescribir el estado si ya existe
+
+# --- 2. PREDICCIÓN POR VOTACIÓN CON FILAS REALES ---
+
+def predecir_con_votacion(pais_secreto, features_visibles, n_votos=300):
+    """
+    Para cada voto, las features ocultas se toman de una fila real aleatoria
+    del dataset. Esto garantiza que las combinaciones de valores sean siempre
+    climáticamente coherentes (ningún modelo ve temp=45°C + longitud de Siberia).
+
+    Las features reveladas son siempre el valor real del país secreto.
+    El país que acumula más votos gana.
+    """
+    # Samplear n_votos filas reales del dataset (con reemplazo)
+    idx_random = np.random.randint(0, len(matriz_dataset), size=n_votos)
+    filas_random = matriz_dataset[idx_random]  # shape: (n_votos, n_features)
+
+    # Construir la matriz de inputs: para features visibles, usar el valor real
+    inputs = filas_random.copy()
+    for i, feat in enumerate(all_features_model):
+        if feat in features_visibles:
+            inputs[:, i] = pais_secreto[feat]
+
+    predicciones = modelo_ia.predict(inputs)
+    return Counter(predicciones.tolist()).most_common(1)[0][0]
+
+
+# --- 3. INICIALIZACIÓN DEL ESTADO ---
+
 if 'juego_activo' not in st.session_state:
     st.session_state.juego_activo = False
     st.session_state.intentos = 0
     st.session_state.pais_secreto_obj = None
     st.session_state.historial = []
 
-# --- 3. FUNCIONES ---
+
+# --- 4. FUNCIONES DE JUEGO ---
 
 def iniciar_juego():
     st.session_state.pais_secreto_obj = df_juego.sample(1).iloc[0]
     st.session_state.intentos = 0
     st.session_state.juego_activo = True
     st.session_state.historial = ["🎮 ¡Partida iniciada! Buena suerte."]
-    # No usamos rerun aquí para evitar parpadeos, dejamos que el script continúe
 
 
-# Cambia la lógica: el juego solo termina si el jugador acierta o se acaban los intentos
-
-# Ahora la IA usa el modelo real y se le van revelando más variables en cada turno
 def jugar_turno(guess_jugador):
     if not st.session_state.juego_activo:
         return
 
     intentos_actuales = st.session_state.intentos
-    # Obtener datos del país secreto seleccionado
-    pais_secreto = st.session_state.pais_secreto_obj
-    pais_real_nombre = pais_secreto[col_name]
-    pais_real_id = pais_secreto[col_id]  # Usamos el ID directo del DF
+    pais_secreto      = st.session_state.pais_secreto_obj
+    pais_real_nombre  = pais_secreto[col_name]
+    pais_real_id      = pais_secreto[col_id]
 
-    # 1. Evaluar Jugador
+    # 1. Evaluar al jugador
     if guess_jugador.strip().lower() == pais_real_nombre.lower():
-        st.session_state.historial.append(f"✅ ¡GANASTE! Adivinaste {pais_real_nombre} en el intento {intentos_actuales + 1}.")
+        st.session_state.historial.append(
+            f"✅ ¡GANASTE! Adivinaste **{pais_real_nombre}** en el intento {intentos_actuales + 1}."
+        )
         st.session_state.juego_activo = False
         st.rerun()
         return
 
-    # 2. Evaluar Máquina (la IA puede acertar, pero el juego sigue hasta que el jugador acierte o se acaben los intentos)
-    # Revelar más variables en cada turno, hasta un máximo de las disponibles
-    max_pistas = min(intentos_actuales + 1, len(lista_features))
+    # 2. Features disponibles este turno
+    max_pistas        = min(intentos_actuales + 1, len(lista_features))
     features_visibles = lista_features[max_pistas - 1]
-    
 
-    # Preparar input para el modelo (asegurar que sea DataFrame o array 2D)
-    input_completo = pd.DataFrame(columns=all_features_model)
-    # Rellenar las visibles con los datos reales
-    for feat in features_visibles:
-        if feat in all_features_model:
-            input_completo[feat] = [pais_secreto[feat]]
-    # Rellenar las NO visibles con la media
-    for feat in all_features_model:
-        if feat not in features_visibles:
-            input_completo[feat] = [medias_features[feat]]
-
-    # Asegurar el orden exacto de columnas del entrenamiento
-    datos_input = input_completo[all_features_model].values.reshape(1, -1)
-    
-      
-    # Predicción
-    prediccion_id = modelo_ia.predict(datos_input)[0]
-    
-    # Buscar el nombre del país predicho por la IA usando el ID predicho
-    # Filtramos el DF original para encontrar qué país tiene ese country_id
+    # 3. Predicción por votación con filas reales
+    prediccion_id    = predecir_con_votacion(pais_secreto, features_visibles, n_votos=300)
     prediccion_match = df_juego[df_juego[col_id] == int(prediccion_id)]
-    
-    if not prediccion_match.empty:
-        pais_predicho_maquina = prediccion_match.iloc[0][col_name]
-    else:
-        pais_predicho_maquina = "Desconocido (ID no encontrado)"
 
-    msg_maquina = f"🤖 **Turno {intentos_actuales + 1}:** La máquina apuesta por {pais_predicho_maquina}."
+    pais_predicho_maquina = (
+        prediccion_match.iloc[0][col_name]
+        if not prediccion_match.empty
+        else "Desconocido"
+    )
 
-    # Comparar IDs para ver si acertó
+    msg_maquina = f"🤖 **Turno {intentos_actuales + 1}:** La máquina apuesta por **{pais_predicho_maquina}**."
+
     if int(prediccion_id) == int(pais_real_id):
         st.session_state.historial.append(msg_maquina + " 🏆 ¡La máquina ha acertado!")
     else:
         st.session_state.historial.append(msg_maquina + " ❌ Falló.")
 
-
-    # Lógica de fin de juego
+    # 4. Fin de juego
     st.session_state.intentos += 1
     if st.session_state.intentos >= 5:
-        st.session_state.historial.append(f"💀 Fin del juego. Era {pais_real_nombre}.")
+        st.session_state.historial.append(f"💀 Fin del juego. Era **{pais_real_nombre}**.")
         st.session_state.juego_activo = False
-        # Guardar el país secreto en el estado para mostrarlo después
         st.session_state.pais_secreto_final = pais_real_nombre
     else:
-        st.session_state.historial.append(f"⏳ Siguiente ronda...")
+        st.session_state.historial.append("⏳ Siguiente ronda...")
 
     st.rerun()
-    
-# --- 4. INTERFAZ (UI) ---
+
+
+# --- 5. INTERFAZ (UI) ---
 
 st.title("🌍 Duelo Climático: Humano vs IA Progresiva")
-
-# DEBUG: Para ver si el estado se mantiene (puedes borrar esto luego)
-# st.caption(f"DEBUG: juego_activo = {st.session_state.juego_activo}, intentos = {st.session_state.intentos}")
-
 
 if not st.session_state.juego_activo:
     st.info("La máquina empieza 'ciega' y va aprendiendo cada turno.")
     if st.button("🚀 Empezar Reto", key="btn_start"):
         iniciar_juego()
         st.rerun()
-    # Mostrar el país secreto al final si existe
     if 'pais_secreto_final' in st.session_state:
         st.success(f"El país secreto era: {st.session_state.pais_secreto_final}")
-        # Eliminarlo para la siguiente partida
         del st.session_state.pais_secreto_final
 else:
-    # Estamos EN JUEGO
-    # Mostrar cuántas variables se revelan en este turno
     max_pistas = min(st.session_state.intentos + 1, len(lista_features))
-    num_vars = len(lista_features[max_pistas - 1])
+    num_vars   = len(lista_features[max_pistas - 1])
     st.markdown(f"### Ronda {st.session_state.intentos + 1}/5")
-    st.caption(f"La máquina usa **{num_vars} variable(s)** climática(s). Se revelan: {', '.join(lista_features[max_pistas - 1])}")
+    st.caption(
+        f"La máquina usa **{num_vars} variable(s)** climática(s). "
+        f"Se revelan: {', '.join(lista_features[max_pistas - 1])}"
+    )
 
-    # Mostrar todas las pistas reveladas hasta el turno actual
-    pistas_actuales = lista_features[max_pistas - 1]
-    for var in pistas_actuales:
-        valor_pista = st.session_state.pais_secreto_obj[var]
-        st.metric(label=f"Pista: {var}", value=valor_pista)
+    # Mostrar pistas en formato compacto (barra horizontal)
+    pistas_html = ""
+    for var in lista_features[max_pistas - 1]:
+        valor = st.session_state.pais_secreto_obj[var]
+        pistas_html += f"<div style='display: inline-block; background: linear-gradient(90deg, #102A43 0%, #C0C0C0 100%); border-radius: 0.8rem; padding: 0.5rem 1rem; margin: 0.3rem; text-align: center; color: #fff8f0; font-weight: bold; font-size: 0.9rem;'><strong>{var}</strong><br><span style='font-size: 1.1rem;'>{valor}</span></div>"
+    st.markdown(pistas_html, unsafe_allow_html=True)
 
-    # Input y Botón
     col1, col2 = st.columns([3, 1])
     with col1:
         guess = st.text_input("Tu predicción:", key="guess_input", placeholder="Escribe el país...")
